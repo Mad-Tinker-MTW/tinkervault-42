@@ -14,18 +14,17 @@ dist-ssr/
 src-tauri/WixTools/
 gen/
 
-# Signing and release artifacts - never in repo
-*.key
+# Signing — private keys and build artifacts stay out of repo
 *.pem
 *.p12
 *.pfx
-*.sig
-mtw-private.key
-mtw-public.key
-minisign.key
+*.key
+!mtw-public.key
 release-manifest.json
-release-manifest.sig
+release-manifest.json.minisig
 SHA256SUMS.txt
+release/
+TinkerVault42_*_release.zip
 
 # Environment and secrets
 .env

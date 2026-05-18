@@ -49,9 +49,13 @@ cargo build --release
 cargo test
 ```
 
-**Signing (optional):**
+**Signing (requires minisign in PATH):**
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/sign_manifest.ps1 -ReleaseFile "<path>"
+# Sign the NSIS installer and produce release-manifest.json + .minisig
+powershell -ExecutionPolicy Bypass -File scripts/sign_manifest.ps1 -InstallerPath "src-tauri\target\release\bundle\nsis\TinkerVault 42_42.1.0_x64-setup.exe"
+
+# Package installer + manifest + sig + VERIFY.txt into release zip
+powershell -ExecutionPolicy Bypass -File scripts/build_release_package.ps1
 ```
 
 ---

@@ -25,3 +25,8 @@ argon2 = "0.5"
 aes-gcm = "0.10"
 walkdir = "2"
 thiserror = "1"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true

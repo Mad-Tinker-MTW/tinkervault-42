@@ -19,7 +19,7 @@ pub struct ForgedSeed {
 
 pub fn forge_seed(input: ForgeInput) -> Result<ForgedSeed> {
     let seed = normalize_seed(&input.seed);
-    if seed.len() < 3 {
+    if seed.chars().count() < 3 {
         return Err(VaultError::Message("Seed phrase must be at least 3 characters.".into()));
     }
 
@@ -34,7 +34,7 @@ pub fn forge_seed(input: ForgeInput) -> Result<ForgedSeed> {
     let ga = glyph5(&a, &place.label, place.lat, place.lon, &date, &sky_time, star.id, "A");
     let gb = glyph5(&b, &place.label, place.lat, place.lon, &date, &sky_time, star.id, "B");
     let gc = glyph5(&c, &place.label, place.lat, place.lon, &date, &sky_time, star.id, "C");
-    let (alt, az) = alt_az(&place, &date, &sky_time, star);
+    let (alt, az) = alt_az(&place, &date, &sky_time, star)?;
 
     let material = format!(
         "TVLT42-FORGE::{}@{:.6},{:.6}::{}::{}::{}::{}::{}::{}::GeoAstroLock42-Nautical57::ALT{}::AZ{}",

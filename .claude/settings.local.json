@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "PowerShell(Get-ChildItem -Path \"Q:\\\\MTW\\\\TinkerVault\" | Select-Object Name, @{Name=\"Type\";Expression={if\\($_.PSIsContainer\\){\"Dir\"}else{\"File\"}}} | Format-Table -AutoSize)"
+      "PowerShell(Get-ChildItem -Path \"Q:\\\\MTW\\\\TinkerVault\" | Select-Object Name, @{Name=\"Type\";Expression={if\\($_.PSIsContainer\\){\"Dir\"}else{\"File\"}}} | Format-Table -AutoSize)",
+      "Bash(cargo check *)",
+      "Bash(node -e \"const lock = require\\('./package-lock.json'\\); const pkgs = ['react','react-dom','vite','lucide-react','framer-motion','@vitejs/plugin-react']; pkgs.forEach\\(p => { const k = 'node_modules/' + p; if\\(lock.packages[k]\\) console.log\\(p + ': ' + lock.packages[k].version\\); }\\)\")"
     ]
   }
 }

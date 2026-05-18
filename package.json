@@ -15,12 +15,12 @@
     "@tauri-apps/api": "^2.0.0",
     "@tauri-apps/plugin-dialog": "^2.0.0",
     "@tauri-apps/plugin-fs": "^2.0.0",
-    "@vitejs/plugin-react": "latest",
-    "vite": "latest",
-    "react": "latest",
-    "react-dom": "latest",
-    "lucide-react": "latest",
-    "framer-motion": "latest"
+    "@vitejs/plugin-react": "6.0.2",
+    "vite": "8.0.13",
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
+    "lucide-react": "1.16.0",
+    "framer-motion": "12.38.0"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.0.0"

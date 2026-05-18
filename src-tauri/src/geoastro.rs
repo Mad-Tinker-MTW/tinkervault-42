@@ -88,9 +88,24 @@ pub fn normalize_date(date: &str) -> Result<String> {
     }
 }
 
-fn validate_date(_y: i32, m: u32, d: u32) -> Result<()> {
-    if !(1..=12).contains(&m) || !(1..=31).contains(&d) {
-        return Err(VaultError::Message("Invalid date range.".into()));
+fn validate_date(y: i32, m: u32, d: u32) -> Result<()> {
+    if !(1..=12).contains(&m) {
+        return Err(VaultError::Message(format!("Invalid date {}-{:02}-{:02}: month must be 01-12.", y, m, d)));
+    }
+    let max_day = match m {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 => {
+            let leap = (y % 4 == 0 && y % 100 != 0) || (y % 400 == 0);
+            if leap { 29 } else { 28 }
+        }
+        _ => unreachable!(),
+    };
+    if d < 1 || d > max_day {
+        return Err(VaultError::Message(format!(
+            "Invalid date {}-{:02}-{:02}: month {} has at most {} days.",
+            y, m, d, m, max_day
+        )));
     }
     Ok(())
 }
@@ -115,9 +130,20 @@ pub fn normalize_sky_time(t: &str) -> Result<String> {
     Ok(format!("{:02}:{:02}", h, m))
 }
 
-fn julian_day_utc(date: &str, sky_time: &str) -> f64 {
-    let dp: Vec<i32> = date.split('-').map(|x| x.parse::<i32>().unwrap()).collect();
-    let tp: Vec<i32> = sky_time.split(':').map(|x| x.parse::<i32>().unwrap()).collect();
+fn julian_day_utc(date: &str, sky_time: &str) -> Result<f64> {
+    let err = |s: &str| VaultError::Message(format!("Internal date/time parse error: '{}'", s));
+    let dp: Vec<i32> = date
+        .split('-')
+        .map(|x| x.parse::<i32>().map_err(|_| err(x)))
+        .collect::<Result<Vec<_>>>()?;
+    let tp: Vec<i32> = sky_time
+        .split(':')
+        .map(|x| x.parse::<i32>().map_err(|_| err(x)))
+        .collect::<Result<Vec<_>>>()?;
+
+    if dp.len() < 3 || tp.len() < 2 {
+        return Err(VaultError::Message("Internal: malformed normalized date/time.".into()));
+    }
 
     let mut y = dp[0];
     let mut m = dp[1];
@@ -133,21 +159,21 @@ fn julian_day_utc(date: &str, sky_time: &str) -> f64 {
     let b = 2 - a + a / 4;
     let day_fraction = (hh as f64 + mm as f64 / 60.0) / 24.0;
 
-    (365.25 * (y + 4716) as f64).floor()
+    Ok((365.25 * (y + 4716) as f64).floor()
         + (30.6001 * (m + 1) as f64).floor()
         + d as f64
         + b as f64
         - 1524.5
-        + day_fraction
+        + day_fraction)
 }
 
-pub fn alt_az(place: &PlaceLock, date: &str, sky_time: &str, star: StarEntry) -> (String, String) {
+pub fn alt_az(place: &PlaceLock, date: &str, sky_time: &str, star: StarEntry) -> Result<(String, String)> {
     let lat = place.lat.to_radians();
     let lon_deg = place.lon;
     let ra_hours = star.ra_hours;
     let dec = star.dec_deg.to_radians();
 
-    let jd = julian_day_utc(date, sky_time);
+    let jd = julian_day_utc(date, sky_time)?;
     let d = jd - 2451545.0;
     let gmst_hours = (18.697374558 + 24.06570982441908 * d).rem_euclid(24.0);
     let lst_hours = (gmst_hours + lon_deg / 15.0).rem_euclid(24.0);
@@ -160,8 +186,8 @@ pub fn alt_az(place: &PlaceLock, date: &str, sky_time: &str, star: StarEntry) ->
     let x = dec.tan() * lat.cos() - lat.sin() * ha.cos();
     let az = y.atan2(x);
 
-    (
+    Ok((
         format!("{:.3}", alt.to_degrees()),
         format!("{:.3}", az.to_degrees().rem_euclid(360.0)),
-    )
+    ))
 }

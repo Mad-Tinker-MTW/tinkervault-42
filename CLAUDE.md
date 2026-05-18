@@ -70,16 +70,17 @@ powershell -ExecutionPolicy Bypass -File scripts/sign_manifest.ps1 -ReleaseFile 
 User Input (5 lock factors)
   seed phrase + place + date + sky time + star
         |
-  seedforge.rs  -- PolyGlyph95-42 deterministic transformation
-        |
-  geoastro.rs   -- GeoAstroLock42-Nautical57: coordinate + stellar angle resolution
+  seedforge.rs  -- PolyGlyph95-42 (calls geoastro.rs + nautical57.rs internally)
+        |         produces material string
+  payload.rs    -- file/folder serialize + SHA256 integrity  [built before key derivation]
         |
   crypto.rs     -- Argon2id Beast Mode: 1 GB RAM, 4 iterations, 1 thread -> 32-byte key
         |
   vault_format.rs -- AES-256-GCM encrypt/decrypt, TVLT42-1 binary format
-        |
-  payload.rs    -- file/folder serialize + SHA256 integrity
 ```
+
+Note: geoastro.rs and nautical57.rs are called inside seedforge.rs, not as separate pipeline
+steps. payload serialization happens before key derivation to avoid holding 1 GB RAM during I/O.
 
 ### Modules (`src-tauri/src/`)
 

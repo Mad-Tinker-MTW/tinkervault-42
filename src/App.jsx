@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { invoke } from "@tauri-apps/api/core";
-import { open, message } from "@tauri-apps/plugin-dialog";
+import { open, message, ask } from "@tauri-apps/plugin-dialog";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import {
   Lock,
@@ -32,6 +32,21 @@ const stars = [
   "Regulus", "Rigel", "Rigil Kentaurus", "Sabik", "Schedar", "Shaula",
   "Sirius", "Spica", "Suhail", "Vega", "Zubenelgenubi"
 ];
+
+function computeExpectedVaultPath(inputPath, payloadType) {
+  if (!inputPath) return null;
+  const useBackslash = inputPath.includes("\\");
+  const sep = useBackslash ? "\\" : "/";
+  const parts = inputPath.split(/[/\\]/);
+  const filename = parts[parts.length - 1];
+  const parent = parts.slice(0, -1).join(sep);
+  const dotIdx = filename.lastIndexOf(".");
+  const stem =
+    payloadType === "folder" || dotIdx <= 0
+      ? filename
+      : filename.substring(0, dotIdx);
+  return (parent ? parent + sep : "") + stem + ".TinkerVault";
+}
 
 const glassAnim = {
   initial: { opacity: 0, y: 14, scale: 0.99 },
@@ -129,21 +144,89 @@ export default function App() {
   }
 
   async function runAction() {
+    let overwrite = false;
+
     try {
       validateInputs();
+
+      // WARN-08: guard against default values on wrap
+      if (mode === "wrap") {
+        const DEFAULTS = { place: "40.814870,-73.888250", date: "1985-09-20", skyTime: "21:00" };
+        const flagged = [];
+        if (place.trim() === DEFAULTS.place) flagged.push("Place");
+        if (date.trim() === DEFAULTS.date) flagged.push("Date");
+        if (skyTime.trim() === DEFAULTS.skyTime) flagged.push("Sky Time");
+        if (flagged.length > 0) {
+          const proceed = await ask(
+            `${flagged.join(" and ")} ${flagged.length === 1 ? "is" : "are"} still at default values. These are not secret.\n\nContinue wrapping?`,
+            { title: "Default values detected", kind: "warning" }
+          );
+          if (!proceed) return;
+        }
+      }
+
+      // BUG-04: pre-check collision for wrap before Beast Mode
+      if (mode === "wrap") {
+        const collision = await invoke("check_wrap_collision", { inputPath: payloadPath });
+        if (collision) {
+          const doOverwrite = await ask(
+            `Output already exists:\n${collision}\n\nOverwrite?`,
+            { title: "File collision", kind: "warning" }
+          );
+          if (!doOverwrite) return;
+          overwrite = true;
+        }
+      }
+
       setBusy(true);
       setLastOutput("");
       setStatus("Working with Argon2id Beast Mode...");
 
-      const request = { payloadPath, seed, place, date, skyTime, star };
+      const request = { payloadPath, seed, place, date, skyTime, star, overwrite };
 
-      const result = mode === "wrap"
-        ? await invoke("wrap_payload", { request })
-        : await invoke("unwrap_vault", { request });
+      if (mode === "wrap") {
+        const result = await invoke("wrap_payload", { request });
+        setLastOutput(result);
 
-      setLastOutput(result);
-      setStatus(mode === "wrap" ? "Wrapped successfully" : "Unwrapped successfully");
-      await message(result, { title: "TinkerVault", kind: "info" });
+        // BUG-03: prompt to delete original after successful wrap
+        const shouldDelete = await ask(
+          `Wrapped successfully.\n\nDelete original? This cannot be undone.\n\n${payloadPath}`,
+          { title: "Delete original?", kind: "warning" }
+        );
+        if (shouldDelete) {
+          try {
+            const delStatus = await invoke("delete_original", { path: payloadPath });
+            setStatus(delStatus);
+          } catch (delErr) {
+            setStatus("Wrap OK. Delete failed.");
+            await message(String(delErr), { title: "Delete error", kind: "error" });
+          }
+        } else {
+          setStatus("Wrapped. Original kept.");
+        }
+      } else {
+        // BUG-04: handle COLLISION error from unwrap after Beast Mode
+        let result;
+        try {
+          result = await invoke("unwrap_vault", { request });
+        } catch (unwrapErr) {
+          const errStr = String(unwrapErr);
+          if (errStr.startsWith("COLLISION:")) {
+            const collidingPath = errStr.slice("COLLISION:".length);
+            const doOverwrite = await ask(
+              `Output already exists:\n${collidingPath}\n\nOverwrite? Beast Mode will run again.`,
+              { title: "File collision", kind: "warning" }
+            );
+            if (!doOverwrite) return;
+            result = await invoke("unwrap_vault", { request: { ...request, overwrite: true } });
+          } else {
+            throw unwrapErr;
+          }
+        }
+        setLastOutput(result);
+        setStatus("Unwrapped successfully");
+        await message(result, { title: "TinkerVault", kind: "info" });
+      }
     } catch (err) {
       setStatus(`Error: ${err}`);
       setLastOutput("");
@@ -214,10 +297,10 @@ IMPORTANT
 
         <section className="glass mini">
           <p className="section-kicker">Mode</p>
-          <button className={mode === "wrap" ? "mode active" : "mode"} onClick={() => setMode("wrap")} disabled={busy}>
+          <button className={mode === "wrap" ? "mode active" : "mode"} onClick={() => { setMode("wrap"); setPayloadPath(""); setPayloadType("file"); }} disabled={busy}>
             <Lock size={16} /> Wrap
           </button>
-          <button className={mode === "unwrap" ? "mode active" : "mode"} onClick={() => setMode("unwrap")} disabled={busy}>
+          <button className={mode === "unwrap" ? "mode active" : "mode"} onClick={() => { setMode("unwrap"); setPayloadPath(""); setPayloadType("vault"); }} disabled={busy}>
             <Unlock size={16} /> Unwrap
           </button>
         </section>
@@ -283,7 +366,25 @@ IMPORTANT
 
             <div className="grid">
               <Field icon={Flame} label="Seed phrase" value={seed} setValue={setSeed} type={showSeed ? "text" : "password"} placeholder="Your private phrase" />
-              <Field icon={MapPin} label="Place or coordinates" value={place} setValue={setPlace} />
+              <label className="field">
+                <span className="field-label"><MapPin size={14} /> Place or coordinates</span>
+                <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                  <input
+                    style={{ flex: 1 }}
+                    type="text"
+                    value={place}
+                    onChange={(e) => setPlace(e.target.value)}
+                  />
+                  <button
+                    className="ghost-btn"
+                    style={{ flexShrink: 0, fontSize: "12px", padding: "4px 10px" }}
+                    onClick={(e) => { e.preventDefault(); invoke("open_coords_url", { query: place }); }}
+                    disabled={busy}
+                  >
+                    Look up
+                  </button>
+                </div>
+              </label>
               <Field icon={Calendar} label="Date" value={date} setValue={setDate} placeholder="YYYY-MM-DD" />
               <Field icon={Clock3} label="Sky Time" value={skyTime} setValue={setSkyTime} placeholder="HH:MM" />
 

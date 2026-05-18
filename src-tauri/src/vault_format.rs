@@ -2,6 +2,7 @@ use crate::crypto::{decrypt, derive_key, encrypt, random_bytes, ARGON2_ITERATION
 use crate::errors::{Result, VaultError};
 use crate::payload::{build_payload, restore_payload, Payload};
 use crate::seedforge::{forge_seed, ForgeInput};
+use crate::utils;
 use serde_json;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -102,7 +103,7 @@ impl Header {
     }
 }
 
-pub fn wrap_path(path: &Path, input: ForgeInput) -> Result<PathBuf> {
+pub fn wrap_path(path: &Path, input: ForgeInput, overwrite: bool) -> Result<PathBuf> {
     if !path.exists() {
         return Err(VaultError::Message("Input path does not exist.".into()));
     }
@@ -123,14 +124,14 @@ pub fn wrap_path(path: &Path, input: ForgeInput) -> Result<PathBuf> {
 
     let ciphertext = encrypt(&key, &header.nonce, &plaintext, &aad)?;
 
-    let output = unique_vault_output(path);
+    let output = unique_vault_output(path, overwrite)?;
     let mut bytes = aad;
     bytes.extend_from_slice(&ciphertext);
     fs::write(&output, bytes)?;
     Ok(output)
 }
 
-pub fn unwrap_path(vault_path: &Path, input: ForgeInput) -> Result<PathBuf> {
+pub fn unwrap_path(vault_path: &Path, input: ForgeInput, overwrite: bool) -> Result<PathBuf> {
     let data = fs::read(vault_path)?;
     let (header, ciphertext) = Header::parse(&data)?;
     let forged = forge_seed(input)?;
@@ -146,40 +147,16 @@ pub fn unwrap_path(vault_path: &Path, input: ForgeInput) -> Result<PathBuf> {
 
     let plaintext = decrypt(&key, &header.nonce, ciphertext, &aad)?;
     let payload: Payload = serde_json::from_slice(&plaintext)?;
-    restore_payload(payload, vault_path)
+    restore_payload(payload, vault_path, overwrite)
 }
 
-fn unique_vault_output(input: &Path) -> PathBuf {
+fn unique_vault_output(input: &Path, overwrite: bool) -> Result<PathBuf> {
     let parent = input.parent().unwrap_or_else(|| Path::new("."));
     let stem = if input.is_dir() {
         input.file_name().unwrap_or_default().to_string_lossy().to_string()
     } else {
         input.file_stem().unwrap_or_default().to_string_lossy().to_string()
     };
-    let first = parent.join(format!("{}.TinkerVault", stem));
-    unique_path(&first)
-}
-
-fn unique_path(path: &Path) -> PathBuf {
-    if !path.exists() {
-        return path.to_path_buf();
-    }
-
-    let parent = path.parent().unwrap_or_else(|| Path::new("."));
-    let stem = path.file_stem().unwrap_or_default().to_string_lossy();
-    let ext = path.extension().map(|e| e.to_string_lossy().to_string());
-
-    for i in 1..10_000 {
-        let name = if let Some(ext) = &ext {
-            format!("{}_{:03}.{}", stem, i, ext)
-        } else {
-            format!("{}_{:03}", stem, i)
-        };
-        let candidate = parent.join(name);
-        if !candidate.exists() {
-            return candidate;
-        }
-    }
-
-    path.to_path_buf()
+    let candidate = parent.join(format!("{}.TinkerVault", stem));
+    utils::unique_path(&candidate, overwrite)
 }

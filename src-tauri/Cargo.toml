@@ -1,0 +1,27 @@
+[package]
+name = "tinkervault-42"
+version = "42.1.0"
+description = "TinkerVault 42"
+authors = ["Mad Tinker's Workshop"]
+edition = "2021"
+
+[lib]
+name = "tinkervault_42_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+rand = "0.8"
+base64 = "0.22"
+argon2 = "0.5"
+aes-gcm = "0.10"
+walkdir = "2"
+thiserror = "1"

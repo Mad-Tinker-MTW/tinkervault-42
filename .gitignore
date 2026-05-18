@@ -1,0 +1,54 @@
+# Rust build artifacts
+src-tauri/target/
+src-tauri/**/*.rs.bk
+*.pdb
+
+# Node
+node_modules/
+dist/
+dist-ssr/
+*.local
+.vite/
+
+# Tauri generated
+src-tauri/WixTools/
+gen/
+
+# Signing and release artifacts - never in repo
+*.key
+*.pem
+*.p12
+*.pfx
+*.sig
+mtw-private.key
+mtw-public.key
+minisign.key
+release-manifest.json
+release-manifest.sig
+SHA256SUMS.txt
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+
+# PMP docs stay in Obsidian only
+docs/pmp/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
+ehthumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+npm-debug.log*

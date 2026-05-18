@@ -1,0 +1,23 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Default permissions for TinkerVault 42",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "dialog:default",
+    "dialog:allow-open",
+    "dialog:allow-message",
+    "fs:default",
+    "fs:allow-home-read",
+    "fs:allow-home-write",
+    "fs:allow-desktop-read",
+    "fs:allow-desktop-write",
+    "fs:allow-document-read",
+    "fs:allow-document-write",
+    "fs:allow-download-read",
+    "fs:allow-download-write",
+    "fs:allow-temp-read",
+    "fs:allow-temp-write"
+  ]
+}
